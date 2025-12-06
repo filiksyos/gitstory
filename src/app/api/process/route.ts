@@ -86,8 +86,11 @@ async function processRepository(
       completedBranches: 0
     });
 
+    // Get GitHub token from environment variable (optional)
+    const githubToken = process.env.GITHUB_TOKEN;
+
     // Clone repository
-    const cloneResult = await cloneRepository(repositoryUrl, jobId);
+    const cloneResult = await cloneRepository(repositoryUrl, jobId, githubToken);
     if (!cloneResult.success || !cloneResult.repoPath) {
       throw new Error(cloneResult.error || 'Failed to clone repository');
     }

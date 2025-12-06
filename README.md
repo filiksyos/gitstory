@@ -260,18 +260,41 @@ Download the generated video file.
 
 ## Configuration
 
-No environment variables required! GitStory works out of the box.
+### Environment Variables
 
-Optional: If you want to configure FFmpeg path or other settings, you can modify the utility files in `src/lib/`.
+GitStory works out of the box for public repositories. For private repositories and higher API rate limits, you can optionally set:
+
+- **GITHUB_TOKEN** (optional): GitHub Personal Access Token (PAT)
+  - Enables access to private repositories
+  - Increases API rate limits (5,000 requests/hour vs 60 requests/hour)
+  - To create a token: https://github.com/settings/tokens
+    - For private repos: select `repo` scope
+    - For public repos only: select `public_repo` scope
+
+Create a `.env` file in the project root:
+
+```bash
+GITHUB_TOKEN=ghp_your_token_here
+```
+
+See `.env.example` for more details.
+
+### Other Settings
+
+If you want to configure FFmpeg path or other settings, you can modify the utility files in `src/lib/`.
 
 ## Limitations
 
-- Only public GitHub repositories supported
+- **Public repositories**: Supported without configuration
+- **Private repositories**: Supported with `GITHUB_TOKEN` environment variable
 - Applications must run on localhost
 - Each branch must use the same install/run commands
 - Video quality: 1280x720, 1 fps
 - Jobs auto-cleanup after 1 hour
 - Temporary files stored on disk during processing
+- **API Rate Limits**: 
+  - Without token: 60 requests/hour (IP-based)
+  - With token: 5,000 requests/hour (authenticated)
 
 ## Troubleshooting
 
@@ -309,7 +332,6 @@ sudo apt-get install -y libgbm-dev libnss3 libatk-bridge2.0-0 libgtk-3-0
 
 ## Future Enhancements
 
-- Support for private repositories (GitHub token)
 - Custom video quality and FPS settings
 - Git commit-based timelapse (not just branches)
 - Screenshot annotations (branch name, date)

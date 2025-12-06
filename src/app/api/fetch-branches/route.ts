@@ -1,14 +1,14 @@
 /**
- * Fetch Environment Variables API
+ * Fetch Branches API
  * 
- * Fetch .env.example from a GitHub repository
+ * Fetch branches from a GitHub repository using GitHub API
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { fetchEnvExample } from '@/lib/env-utils';
+import { fetchBranches } from '@/lib/git-utils';
 
-const FetchEnvSchema = z.object({
+const FetchBranchesSchema = z.object({
   repositoryUrl: z.string().min(1, 'Repository URL is required')
 });
 
@@ -17,21 +17,28 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     
     // Validate request
-    const { repositoryUrl } = FetchEnvSchema.parse(body);
+    const { repositoryUrl } = FetchBranchesSchema.parse(body);
 
     // Get GitHub token from environment variable (optional)
     const githubToken = process.env.GITHUB_TOKEN;
 
-    // Fetch environment variables
-    const envVars = await fetchEnvExample(repositoryUrl, githubToken);
+    // Fetch branches
+    const result = await fetchBranches(repositoryUrl, githubToken);
+
+    if (!result.success) {
+      return NextResponse.json(
+        { success: false, error: result.error || 'Failed to fetch branches' },
+        { status: 400 }
+      );
+    }
 
     return NextResponse.json({
       success: true,
-      envVars
+      branches: result.branches || []
     });
 
   } catch (error: any) {
-    console.error('Error in fetch-env API:', error);
+    console.error('Error in fetch-branches API:', error);
     
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -41,8 +48,9 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { success: false, error: error.message || 'Failed to fetch environment variables' },
+      { success: false, error: error.message || 'Failed to fetch branches' },
       { status: 500 }
     );
   }
 }
+

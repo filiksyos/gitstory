@@ -17,6 +17,7 @@ export default function Home() {
   // Job state
   const [isProcessing, setIsProcessing] = useState(false);
   const [isFetchingEnv, setIsFetchingEnv] = useState(false);
+  const [isFetchingBranches, setIsFetchingBranches] = useState(false);
   const [currentJob, setCurrentJob] = useState<Job | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -31,6 +32,43 @@ export default function Home() {
       }
     };
   }, []);
+
+  // Fetch branches
+  const handleFetchBranches = async () => {
+    if (!repositoryUrl) {
+      alert('Please enter a repository URL first');
+      return;
+    }
+
+    setIsFetchingBranches(true);
+    setError(null);
+
+    try {
+      const response = await fetch('/api/fetch-branches', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ repositoryUrl })
+      });
+
+      const data = await response.json();
+
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to fetch branches');
+      }
+
+      if (data.branches && data.branches.length > 0) {
+        setAvailableBranches(data.branches);
+        // Clear selected branches when fetching new ones
+        setSelectedBranches([]);
+      } else {
+        alert('No branches found in this repository');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to fetch branches');
+    } finally {
+      setIsFetchingBranches(false);
+    }
+  };
 
   // Fetch environment variables
   const handleFetchEnvVars = async () => {
@@ -76,13 +114,6 @@ export default function Home() {
         ? prev.filter(b => b !== branch)
         : [...prev, branch]
     );
-  };
-
-  // Add common branches manually (user can add custom ones)
-  const addBranch = (branch: string) => {
-    if (branch && !availableBranches.includes(branch)) {
-      setAvailableBranches(prev => [...prev, branch]);
-    }
   };
 
   // Submit form
@@ -222,6 +253,14 @@ export default function Home() {
                   />
                   <button
                     type="button"
+                    onClick={handleFetchBranches}
+                    disabled={isFetchingBranches || !repositoryUrl}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-md font-medium transition-colors"
+                  >
+                    {isFetchingBranches ? 'Loading...' : 'Fetch Branches'}
+                  </button>
+                  <button
+                    type="button"
                     onClick={handleFetchEnvVars}
                     disabled={isFetchingEnv || !repositoryUrl}
                     className="px-4 py-2 bg-gray-600 hover:bg-gray-700 disabled:bg-gray-400 text-white rounded-md font-medium transition-colors"
@@ -237,33 +276,17 @@ export default function Home() {
                   Select Branches
                 </label>
                 <div className="space-y-2">
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => addBranch('main')}
-                      className="px-3 py-1 text-sm bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded"
-                    >
-                      + main
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => addBranch('develop')}
-                      className="px-3 py-1 text-sm bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded"
-                    >
-                      + develop
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => addBranch('staging')}
-                      className="px-3 py-1 text-sm bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded"
-                    >
-                      + staging
-                    </button>
-                  </div>
-                  {availableBranches.length > 0 && (
-                    <div className="border border-gray-300 dark:border-gray-600 rounded-md p-3 space-y-2">
+                  {isFetchingBranches ? (
+                    <div className="text-center py-4">
+                      <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                      <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                        Fetching branches...
+                      </p>
+                    </div>
+                  ) : availableBranches.length > 0 ? (
+                    <div className="border border-gray-300 dark:border-gray-600 rounded-md p-3 space-y-2 max-h-60 overflow-y-auto">
                       {availableBranches.map(branch => (
-                        <label key={branch} className="flex items-center gap-2 cursor-pointer">
+                        <label key={branch} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 p-2 rounded">
                           <input
                             type="checkbox"
                             checked={selectedBranches.includes(branch)}
@@ -274,10 +297,18 @@ export default function Home() {
                         </label>
                       ))}
                     </div>
+                  ) : (
+                    <div className="border border-gray-300 dark:border-gray-600 rounded-md p-4 text-center">
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        Click "Fetch Branches" to load available branches from the repository
+                      </p>
+                    </div>
                   )}
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Click buttons above to add common branches, then select which ones to include
-                  </p>
+                  {availableBranches.length > 0 && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {selectedBranches.length} of {availableBranches.length} branches selected
+                    </p>
+                  )}
                 </div>
               </div>
 
