@@ -6,8 +6,10 @@
 
 /**
  * Fetch and parse .env.example file from a GitHub repository
+ * @param repositoryUrl - GitHub repository URL
+ * @param githubToken - Optional GitHub Personal Access Token for private repos
  */
-export async function fetchEnvExample(repositoryUrl: string): Promise<string[]> {
+export async function fetchEnvExample(repositoryUrl: string, githubToken?: string): Promise<string[]> {
   try {
     console.log('🔍 Fetching .env.example from:', repositoryUrl);
 
@@ -19,7 +21,45 @@ export async function fetchEnvExample(repositoryUrl: string): Promise<string[]> 
 
     const [, owner, repo] = match;
     
-    // Construct raw.githubusercontent.com URL
+    // If token is provided, use GitHub API (works for private repos)
+    if (githubToken) {
+      try {
+        // Try main branch first
+        const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/.env.example?ref=main`;
+        const headers: HeadersInit = {
+          'Accept': 'application/vnd.github.v3+json',
+          'Authorization': `token ${githubToken}`,
+          'User-Agent': 'GitStory'
+        };
+
+        let response = await fetch(apiUrl, { headers });
+        
+        if (response.status === 404) {
+          // Try master branch
+          const masterApiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/.env.example?ref=master`;
+          response = await fetch(masterApiUrl, { headers });
+        }
+
+        if (response.status === 404) {
+          console.log('ℹ️ No .env.example file found in repository');
+          return [];
+        }
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch .env.example: ${response.statusText}`);
+        }
+
+        const fileData = await response.json();
+        // GitHub API returns base64 encoded content
+        const content = Buffer.from(fileData.content, 'base64').toString('utf-8');
+        return parseEnvFile(content);
+      } catch (apiError) {
+        console.warn('⚠️ GitHub API fetch failed, falling back to raw URL:', apiError);
+        // Fall through to raw URL method
+      }
+    }
+    
+    // Use raw.githubusercontent.com for public repos (or fallback)
     const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/main/.env.example`;
     
     console.log('🌐 Fetching from:', rawUrl);

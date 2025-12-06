@@ -47,14 +47,53 @@ async function installDependencies(repoPath: string, installCommand: string): Pr
 }
 
 /**
+ * Modify run command to use specified port
+ */
+function modifyCommandForPort(runCommand: string, port: number): string {
+  // Check if port flag already exists
+  if (runCommand.includes('-p ') || runCommand.includes('--port ') || runCommand.match(/-p\d+/)) {
+    return runCommand; // Already has port specified
+  }
+  
+  // Handle npm/pnpm/yarn run commands - pass flags through with --
+  if (runCommand.match(/^(npm|pnpm|yarn)\s+run\s+/)) {
+    // Append -- -p ${port} to pass through to the underlying script
+    return `${runCommand} -- -p ${port}`;
+  }
+  
+  // Check if it's a direct Next.js command
+  if (runCommand.includes('next dev') || runCommand.includes('next start')) {
+    // Insert -p flag after 'next dev' or 'next start'
+    return runCommand.replace(/(next\s+(dev|start))/, `$1 -p ${port}`);
+  }
+  
+  // Check if it's a direct Vite command
+  if (runCommand.includes('vite')) {
+    return `${runCommand} --port ${port}`;
+  }
+  
+  // For other commands, PORT env var will be set (works for React Scripts, Express, etc.)
+  return runCommand;
+}
+
+/**
  * Start the application in background
  */
-function startApplication(repoPath: string, runCommand: string, envVars?: Record<string, string>): any {
+function startApplication(repoPath: string, runCommand: string, port: number, envVars?: Record<string, string>): any {
   const { spawn } = require('child_process');
   
-  const [cmd, ...args] = runCommand.split(' ');
+  // Modify command to use the specified port
+  const modifiedCommand = modifyCommandForPort(runCommand, port);
+  console.log('🔧 Modified command:', modifiedCommand);
   
-  const env = { ...process.env, ...envVars };
+  const [cmd, ...args] = modifiedCommand.split(' ');
+  
+  // Set PORT environment variable (works for most frameworks)
+  const env = { 
+    ...process.env, 
+    PORT: port.toString(),
+    ...envVars 
+  };
   
   // On Windows, use shell: true to properly resolve commands like pnpm
   const isWindows = process.platform === 'win32';
@@ -77,8 +116,6 @@ function startApplication(repoPath: string, runCommand: string, envVars?: Record
  * Wait for URL to respond
  */
 async function waitForUrl(url: string, maxRetries: number = 30, delayMs: number = 2000): Promise<boolean> {
-  console.log('🏓 Waiting for application to start at:', url);
-
   for (let i = 0; i < maxRetries; i++) {
     try {
       const response = await fetch(url, { 
@@ -87,17 +124,15 @@ async function waitForUrl(url: string, maxRetries: number = 30, delayMs: number 
       });
 
       if (response.ok || response.status === 404) {
-        console.log('✅ Application is responding!');
         return true;
       }
     } catch (error) {
-      console.log(`Attempt ${i + 1}/${maxRetries}: Not ready yet...`);
+      // Silently retry - we'll log at a higher level
     }
 
     await new Promise(resolve => setTimeout(resolve, delayMs));
   }
 
-  console.error('❌ Application did not start within timeout period');
   return false;
 }
 
@@ -178,18 +213,34 @@ export async function runAndScreenshot(
     }
 
     // Start application
-    appProcess = startApplication(repoPath, runCommand, envVars);
+    appProcess = startApplication(repoPath, runCommand, port, envVars);
 
     // Wait for application to be ready
-    const url = `http://localhost:${port}`;
-    const isReady = await waitForUrl(url, 30, 2000);
-
+    // Try the specified port first, then common alternatives
+    const portsToTry = [port, 3000, 3001, 5000, 5173, 8080];
+    let isReady = false;
+    let actualPort = port;
+    
+    for (const testPort of portsToTry) {
+      const url = `http://localhost:${testPort}`;
+      console.log(`🔍 Trying port ${testPort}...`);
+      isReady = await waitForUrl(url, 10, 2000); // Fewer retries per port since we're trying multiple
+      
+      if (isReady) {
+        actualPort = testPort;
+        console.log(`✅ Application found on port ${actualPort}`);
+        break;
+      }
+    }
+    
     if (!isReady) {
       return {
         success: false,
-        error: 'Application did not start in time'
+        error: `Application did not start on any of the tried ports: ${portsToTry.join(', ')}`
       };
     }
+    
+    const url = `http://localhost:${actualPort}`;
 
     // Prepare screenshot directory
     const screenshotDir = path.join(process.cwd(), 'screenshots', jobId);
