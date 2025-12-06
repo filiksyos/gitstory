@@ -23,6 +23,19 @@ export async function GET(
         controller.enqueue(encoder.encode(message));
       };
 
+      let isClosed = false;
+      
+      const closeController = () => {
+        if (!isClosed) {
+          isClosed = true;
+          try {
+            controller.close();
+          } catch (error) {
+            // Controller might already be closed, ignore
+          }
+        }
+      };
+
       // Poll for job updates every 500ms
       const interval = setInterval(() => {
         const job = getJob(jobId);
@@ -30,7 +43,7 @@ export async function GET(
         if (!job) {
           sendEvent({ error: 'Job not found' });
           clearInterval(interval);
-          controller.close();
+          closeController();
           return;
         }
 
@@ -41,7 +54,7 @@ export async function GET(
         if (job.status === 'complete' || job.status === 'error') {
           clearInterval(interval);
           setTimeout(() => {
-            controller.close();
+            closeController();
           }, 1000);
         }
       }, 500);
@@ -49,7 +62,7 @@ export async function GET(
       // Cleanup on client disconnect
       request.signal.addEventListener('abort', () => {
         clearInterval(interval);
-        controller.close();
+        closeController();
       });
     }
   });

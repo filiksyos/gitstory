@@ -77,7 +77,16 @@ pnpm install
 yarn install
 ```
 
-3. Run the development server:
+3. Install Puppeteer Chrome browser:
+```bash
+npm exec puppeteer browsers install chrome
+# or
+pnpm exec puppeteer browsers install chrome
+# or
+yarn exec puppeteer browsers install chrome
+```
+
+4. Run the development server:
 ```bash
 npm run dev
 # or
@@ -86,7 +95,7 @@ pnpm dev
 yarn dev
 ```
 
-4. Open [http://localhost:3000](http://localhost:3000) in your browser
+5. Open [http://localhost:3000](http://localhost:3000) in your browser
 
 ## Usage
 
@@ -272,9 +281,19 @@ Make sure FFmpeg is installed and in your PATH:
 ffmpeg -version
 ```
 
-### Puppeteer installation issues
+### Puppeteer Chrome browser not found
+Install the Chrome browser for Puppeteer:
 ```bash
-# Install Chrome dependencies on Linux
+npm exec puppeteer browsers install chrome
+# or
+pnpm exec puppeteer browsers install chrome
+# or
+yarn exec puppeteer browsers install chrome
+```
+
+### Puppeteer installation issues (Linux)
+Install Chrome dependencies on Linux:
+```bash
 sudo apt-get install -y libgbm-dev libnss3 libatk-bridge2.0-0 libgtk-3-0
 ```
 

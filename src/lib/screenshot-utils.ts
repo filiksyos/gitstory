@@ -25,12 +25,15 @@ async function installDependencies(repoPath: string, installCommand: string): Pr
   try {
     console.log('📥 Installing dependencies with:', installCommand);
     
+    // On Windows, use shell: true to properly resolve commands like pnpm
+    const isWindows = process.platform === 'win32';
     const { stdout, stderr } = await execAsync(installCommand, {
       cwd: repoPath,
-      timeout: 300000 // 5 minutes timeout
+      timeout: 300000, // 5 minutes timeout
+      shell: isWindows ? true : undefined // Use shell on Windows to resolve PATH
     });
 
-    if (stderr && !stderr.includes('npm WARN')) {
+    if (stderr && !stderr.includes('npm WARN') && !stderr.includes('pnpm WARN')) {
       console.log('Install stderr:', stderr);
     }
 
@@ -53,11 +56,15 @@ function startApplication(repoPath: string, runCommand: string, envVars?: Record
   
   const env = { ...process.env, ...envVars };
   
+  // On Windows, use shell: true to properly resolve commands like pnpm
+  const isWindows = process.platform === 'win32';
+  
   const child = spawn(cmd, args, {
     cwd: repoPath,
     env,
     detached: true,
-    stdio: 'ignore'
+    stdio: 'ignore',
+    shell: isWindows ? true : undefined // Use shell on Windows to resolve PATH
   });
 
   child.unref();
@@ -118,7 +125,7 @@ async function takeScreenshot(url: string, outputPath: string): Promise<boolean>
     });
 
     // Wait a bit for any animations
-    await page.waitForTimeout(1000);
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
     // Take screenshot
     await page.screenshot({ path: outputPath, type: 'png' });
